@@ -1,306 +1,238 @@
+# Dashboard baca-saja hasil eksperimen skripsi Maninjau (data CSV asli).
 from pathlib import Path
 import pandas as pd
-import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
-BASE_DIR = Path(__file__).resolve().parent
+st.set_page_config(page_title="Maninjau | Analisis ERA5-Land", page_icon="🌊", layout="wide", initial_sidebar_state="expanded")
+ROOT = Path(__file__).resolve().parent
+DATA = ROOT / "data"
+COLORS = {"XGBoost":"#0D9488", "Random Forest":"#2563EB", "SVR":"#EA580C", "Persistence Anomali":"#64748B", "Persistence Suhu":"#A855F7"}
 
-st.set_page_config(
-    page_title="Dashboard Analisis ERA5-Land — Danau Maninjau",
-    page_icon="📊",
-    layout="wide"
-)
+@st.cache_data(show_spinner=False)
+def read_csv(filename):
+    path = DATA / filename
+    if not path.is_file():
+        st.error(f"File data tidak ditemukan: {filename}. Pastikan folder data/ ikut diunggah ke GitHub.")
+        st.stop()
+    return pd.read_csv(path)
 
+@st.cache_data(show_spinner=False)
+def load_everything():
+    return {name:read_csv(name) for name in [
+        "evaluasi_model.csv","tuning_rocv.csv","feature_importance.csv","prediksi_t1.csv","prediksi_t3.csv",
+        "audit_satelit.csv","evaluasi_upwelling.csv","inventaris_upwelling.csv","audit_grid.csv"]}
 
-@st.cache_data
-def load_locked_artifacts():
-    grid_df = pd.read_csv(BASE_DIR / "maninjau_audit_grid_era5.csv")
-    modis_sens = pd.read_csv(BASE_DIR / "evaluasi_khusus_era5_vs_modis_terra.csv")
-    rocv_df = pd.read_csv(BASE_DIR / "hasil_tuning_validasi_2022_2023.csv")
-    test_df = pd.read_csv(BASE_DIR / "hasil_evaluasi_test_2024_2025.csv")
-    feat_df = pd.read_csv(BASE_DIR / "hasil_feature_importance.csv")
-    inv_df = pd.read_csv(BASE_DIR / "inventaris_upwelling_maninjau_2016_2025.csv")
-    upw_df = pd.read_csv(BASE_DIR / "hasil_evaluasi_eksploratif_upwelling.csv")
-    pred_t1 = pd.read_csv(
-        BASE_DIR / "prediksi_uji_independen_t1_2024_2025.csv",
-        parse_dates=["date", "target_date"]
-    )
-    pred_t3 = pd.read_csv(
-        BASE_DIR / "prediksi_uji_independen_t3_2024_2025.csv",
-        parse_dates=["date", "target_date"]
-    )
-    return grid_df, modis_sens, rocv_df, test_df, feat_df, inv_df, upw_df, pred_t1, pred_t3
+files = load_everything()
+metric = files['evaluasi_model.csv']
+tuning = files['tuning_rocv.csv']
+fi = files['feature_importance.csv']
+sat = files['audit_satelit.csv']
+upw = files['evaluasi_upwelling.csv']
+inv = files['inventaris_upwelling.csv']
 
+st.markdown('''<style>
+.block-container {padding-top:1.6rem; max-width:1450px}
+h1,h2,h3 {letter-spacing:-.035em}
+[data-testid="stMetric"] {border:1px solid rgba(128,128,128,.25);border-radius:14px;padding:15px;background:rgba(128,128,128,.045)}
+.smallnote {color:#64748b;font-size:.88rem}
+</style>''', unsafe_allow_html=True)
 
-grid_df, modis_sens, rocv_df, test_df, feat_df, inv_df, upw_df, pred_t1, pred_t3 = load_locked_artifacts()
+st.sidebar.title("🌊 Danau Maninjau")
+st.sidebar.caption("Dashboard hasil penelitian • 2016–2025")
+page = st.sidebar.radio("Navigasi", [
+    "Ringkasan", "Komparasi Model", "Prediksi Deret Waktu", "Validasi ROCV", "Feature Importance",
+    "Audit Satelit", "Catatan Historis", "Tentang Data"], index=0)
+st.sidebar.divider()
+st.sidebar.info("**Target model adalah anomali suhu keluaran ERA5-Land/FLake**, bukan pengukuran in-situ atau deteksi upwelling. Seluruh grafik diturunkan dari CSV eksperimen yang disertakan.")
+st.sidebar.caption("Skema 1 · Komparasi RF, XGBoost, dan SVR · Data uji 2024–2025")
 
-# Header utama & pembatasan klaim ilmiah
-st.title("📊 Dashboard Analisis ERA5-Land — Danau Maninjau")
-st.caption(
-    "**Pendukung Demonstrasi Seminar Hasil (Skema 1: Pengembangan Algoritma / Model / Analisis)** — "
-    "Komparasi Algoritma *Random Forest*, *XGBoost*, dan *Support Vector Regression* (SVR) untuk Prediksi Anomali Suhu "
-    "Lapisan Tercampur Reanalisis *ERA5-Land* di Kawasan Danau Maninjau Berbasis *Google Earth Engine* (2016–2025)."
-)
+MODEL_MAP = {
+ "XGBoost":"XGBoost", "Random Forest":"Random Forest", "SVR":"SVR",
+ "Baseline Persistence (Anomali: A_t+h = A_t)":"Persistence Anomali",
+ "Baseline Persistence (Suhu Mentah: T_t+h = T_t)":"Persistence Suhu",
+}
+def label_model(value):
+    return MODEL_MAP.get(value,value)
+def scheme_label(s):
+    return "Utama · 73 fitur" if str(s).startswith('1_') else "Ablasi · 55 fitur"
+def prep_metric():
+    x=metric.copy()
+    x['Model Tampilan'] = x['Model'].map(label_model)
+    x['Skema'] = x['Rezim_Fitur'].map(scheme_label)
+    return x
 
-st.info(
-    "**Catatan Batasan Ilmiah (Read-Only Experimental Viewer):** Dashboard ini menampilkan hasil eksperimen retrospektif "
-    "yang telah dikunci dari periode Latih/ROCV (`2016–2023`) dan Uji Independen (`2024–2025`). Target yang diprediksi adalah "
-    "**anomali suhu lapisan tercampur keluaran reanalisis ERA5-Land (`era5_lake_mix_temp_c`)**, bukan pengukuran suhu air "
-    "lapangan (*in-situ*) dan bukan sistem deteksi *upwelling* operasional secara langsung."
-)
+def fmtc(x,nd=4):
+    return (f"{x:,.{nd}f}".replace(',','Q').replace('.',',').replace('Q','.'))
 
-# Baris metrik ringkasan utama
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric(
-        label="Model Terbaik t+1 (73 Fitur)",
-        value="XGBoost (0,1063°C)",
-        delta="-18,61% RMSE vs Persistence"
-    )
-    st.caption("MAE = 0,0794°C · R² Anomali = 0,9281")
-with col2:
-    st.metric(
-        label="Model Terbaik t+3 (73 Fitur - RMSE)",
-        value="XGBoost (0,1952°C)",
-        delta="-9,46% RMSE vs Persistence"
-    )
-    st.caption("MAE Terendah t+3: SVR = 0,1444°C · R² XGB = 0,7574")
-with col3:
-    st.metric(
-        label="Skema Ablasi Meteo (55 Fitur)",
-        value="XGB (t+1) / SVR (t+3)",
-        delta="R² = 0,6545 (t+1) & 0,5615 (t+3)"
-    )
-    st.caption("Tanpa 18 fitur riwayat suhu/anomali danau")
-with col4:
-    st.metric(
-        label="Audit Grid & MODIS Terra Ketat",
-        value="52,20% Air | MAE 1,10°C",
-        delta="N = 117 dari 3.653 hari (3,2%)"
-    )
-    st.caption("Korelasi MODIS Terra ketat: r = 0,298 (ρ = 0,330)")
+def download_df(frame, filename):
+    st.download_button("⬇️ Unduh tabel CSV", frame.to_csv(index=False).encode('utf-8-sig'), file_name=filename, mime='text/csv')
 
-st.divider()
+def plot_style(fig, height=480):
+    fig.update_layout(height=height, margin=dict(l=20,r=20,t=55,b=30), legend_title_text='', hovermode='x unified')
+    return fig
 
-# Navigasi 6 menu sesuai rekomendasi
-menu = st.sidebar.radio(
-    "Pilih Menu Eksplorasi Hasil:",
-    [
-        "1. Ringkasan Penelitian & Batasan Data",
-        "2. Komparasi RF, XGBoost, SVR & Baseline",
-        "3. Grafik Target Referensi ERA5-Land vs Prediksi",
-        "4. Feature Importance & Ablasi (73 vs 55 Fitur)",
-        "5. Audit ERA5-Land vs MODIS/Landsat",
-        "6. Eksplorasi 15 Catatan Historis Upwelling",
-    ]
-)
+if page == "Ringkasan":
+    st.title("Analisis Prediksi Anomali Suhu ERA5-Land")
+    st.caption("Kawasan Danau Maninjau · eksperimen retrospektif 2016–2025 · pengujian independen 2024–2025")
+    x=prep_metric()
+    main=x[(x['Skema']=="Utama · 73 fitur") & (x['Model Tampilan']=="XGBoost")].set_index('Horizon')
+    a,b,c,d=st.columns(4)
+    a.metric("Jumlah hari reanalisis", "3.653")
+    b.metric("RMSE XGBoost · t+1",f"{fmtc(main.loc['t+1','Test_Anom_RMSE'])} °C")
+    c.metric("R² XGBoost · t+1",fmtc(main.loc['t+1','Test_Anom_R2']))
+    d.metric("RMSE XGBoost · t+3",f"{fmtc(main.loc['t+3','Test_Anom_RMSE'])} °C")
+    st.markdown('### Temuan kunci')
+    col1,col2=st.columns([1.2,1])
+    with col1:
+        st.markdown('''**Ringkasan temuan eksperimen**
+- XGBoost memiliki RMSE terendah pada skema utama untuk horizon t+1 maupun t+3.
+- SVR memperoleh MAE terendah pada skema utama t+3, serta RMSE terendah pada ablasi t+3.
+- Performa menurun saat seluruh fitur historis suhu dihapus (ablasi 55 fitur).
+- Evaluasi satelit memperlihatkan keterbatasan kesesuaian observasional target ERA5-Land.
+- 15 catatan historis dianalisis **deskriptif**, bukan sebagai label klasifikasi upwelling.
+''')
+    with col2:
+        sub=x[(x['Skema']=="Utama · 73 fitur") & (x['Model Tampilan'].isin(['XGBoost','Random Forest','SVR']))]
+        fig=px.bar(sub,x='Model Tampilan',y='Test_Anom_RMSE',color='Horizon',barmode='group',title='RMSE skema utama (lebih kecil lebih baik)',labels={'Test_Anom_RMSE':'RMSE (°C)','Model Tampilan':'Algoritma'},text_auto='.4f')
+        st.plotly_chart(plot_style(fig,370),use_container_width=True)
+    st.warning("Interpretasi: hasil ini menggambarkan prediksi terhadap **keluaran model reanalisis ERA5-Land**, bukan ketepatan suhu air terukur danau ataupun akurasi deteksi upwelling.")
 
-if menu == "1. Ringkasan Penelitian & Batasan Data":
-    st.subheader("1. Ringkasan Desain Penelitian, Batasan Validitas, dan Poin Penting Sidang")
-    c_left, c_right = st.columns(2)
-    with c_left:
-        st.markdown(
-            """
-            #### A. Pembagian Periode Data & Pengendalian *Lookahead Bias*
-            * **Rentang Studi:** 1 Januari 2016 – 31 Desember 2025 (**3.653 hari**, ketersediaan ERA5-Land & CHIRPS 100%).
-            * **Indeks Kalender Konsisten (`cal_doy_365`):** Pemetaan pasangan `(bulan, hari)` ke 1..365 (29 Februari pada tahun kabisat 2016, 2020, 2024 dipetakan ke indeks 59 bersama 28 Februari) agar tidak bergeser pasca-Februari.
-            * **Isolasi Klimatologi & Pemisahan Kronologis Target:** Rata-rata klimatologi harian (dihaluskan 15 hari melingkar) dihitung **hanya dari data latih aktif** pada masing-masing *fold* (`date <= tr_end`), dan sampel pelatihan dipotong agar tanggal target tidak menyeberang ke periode validasi/uji (`target_date <= tr_end`).
-            * **Seleksi Hyperparameter (*3-Fold Rolling-Origin CV*):**
-              - *Fold 1:* Latih `2016–2019` → Validasi `2020–2021`
-              - *Fold 2:* Latih `2016–2020` → Validasi `2021–2022`
-              - *Fold 3:* Latih `2016–2021` → Validasi `2022–2023`
-            * **Pengujian Final Independen (*Out-of-Sample*):** Dilatih satu kali pada `2016–2023`, diuji satu kali pada **`2024–2025`** ($N=730$ hari untuk $t+1$; $N=728$ hari untuk $t+3$).
-            """
-        )
-    with c_right:
-        st.markdown(
-            """
-            #### B. Ringkasan Jawaban Kunci untuk Pertanyaan Penguji (Sempro & Semhas)
-            1. **Mengapa memilih `ERA5-Land` sebagai target, bukan satelit MODIS/Landsat?**
-               Karena di kaldera tropis Bukit Barisan, tutupan awan menyebabkan MODIS Terra siang hanya tersedia pada 25,2% hari (dan hanya **3,2% hari [117 hari]** setelah penyaringan kualitas ketat $\ge 15/22$ piksel, homogenitas $\le 0,5^\circ\text{C}$, dan *near-nadir* $\le 30^\circ$), sedangkan regresi deret waktu berlag harian membutuhkan deret kontinu 100%.
-            2. **Apa perbedaan utama dari penelitian Syakir dkk. (2025)?**
-               Syakir dkk. (2025) membentuk label kelas potensi *upwelling* dari klasterisasi tanpa pengawasan (*K-Means*) pada variabel cuaca. Penelitian ini memodelkan besaran kontinu **anomali suhu lapisan tercampur reanalisis** dengan pengendalian *lookahead bias*, mengujinya terhadap **dua *Baseline Persistence*** ($\hat{A}_{t+h}=A_t$ dan $\hat{T}_{t+h}=T_t$), melakukan **uji ablasi fitur (73 vs 55 fitur)**, serta mengaudit keterbatasannya terhadap satelit dan 15 catatan kejadian.
-            3. **Mengapa performa menurun dari $t+1$ ke $t+3$ dan dari 73 fitur ke 55 fitur?**
-               Pada $t+3$, ketidakpastian gangguan cuaca atmosfer selama 3 hari ke depan meningkat sehingga RMSE naik dari $0,1063^\circ\text{C}$ menjadi $0,1952^\circ\text{C}$. Penghapusan 18 fitur termal danau pada Skema Ablasi (55 fitur) menurunkan $R^2$ dari $0,9281$ ke $0,6545$ ($t+1$), yang menunjukkan dominannya informasi riwayat suhu dalam kemampuan prediksi jangka pendek.
-            """
-        )
+elif page == "Komparasi Model":
+    st.title("Komparasi akurasi model")
+    horizon=st.radio('Horizon prediksi', ['t+1','t+3'], horizontal=True)
+    data=prep_metric().query('Horizon == @horizon').copy()
+    scheme=st.selectbox('Rezim fitur', ['Utama · 73 fitur','Ablasi · 55 fitur'])
+    data=data[data['Skema']==scheme]
+    vals={'RMSE (°C)':'Test_Anom_RMSE','MAE (°C)':'Test_Anom_MAE','R² anomali':'Test_Anom_R2','R² suhu ERA5':'Test_Temp_R2'}
+    metric_choice=st.selectbox('Metrik',list(vals))
+    key=vals[metric_choice]
+    data=data.sort_values(key,ascending='R²' not in metric_choice)
+    fig=px.bar(data,x='Model Tampilan',y=key,color='Model Tampilan',color_discrete_map=COLORS,text_auto='.4f',labels={'Model Tampilan':'Model',key:metric_choice},title=f'{metric_choice} · {scheme} · {horizon}')
+    fig.update_layout(showlegend=False)
+    st.plotly_chart(plot_style(fig),use_container_width=True)
+    st.dataframe(data[['Horizon','Skema','Model Tampilan','Test_Anom_MAE','Test_Anom_RMSE','Test_Anom_R2','Test_Temp_R2']],hide_index=True,use_container_width=True)
+    download_df(data,'komparasi_model.csv')
+    st.caption('MAE dan RMSE pada skala suhu dan anomali identik karena perbedaan hanya berupa klimatologi deterministik; R² bisa berbeda.')
 
-    st.markdown("#### C. Bagan Kerangka Pemikiran Penelitian (Gambar 1)")
-    img_kerangka = BASE_DIR / "Gambar_0_Kerangka_Pemikiran.png"
-    if img_kerangka.is_file():
-        st.image(str(img_kerangka), use_container_width=True)
+elif page == "Prediksi Deret Waktu":
+    st.title("Deret waktu: referensi vs prediksi")
+    hor=st.radio('Horizon', ['t+1','t+3'], horizontal=True)
+    df=files['prediksi_t1.csv' if hor=='t+1' else 'prediksi_t3.csv'].copy()
+    df['target_date']=pd.to_datetime(df['target_date'])
+    regimen=st.selectbox('Rezim model', ['Utama · 73 fitur','Ablasi · 55 fitur'])
+    names=['XGBoost','Random Forest','SVR']
+    if regimen.startswith('Utama'):
+        names += ['Persistence Anomali','Persistence Suhu']
+    selected=st.multiselect('Tampilkan model',names,default=['XGBoost','SVR'])
+    mapping={
+        'XGBoost':('pred_anom_XGBoost','pred_anom_meteo_XGBoost'),
+        'Random Forest':('pred_anom_Random Forest','pred_anom_meteo_Random Forest'),
+        'SVR':('pred_anom_SVR','pred_anom_meteo_SVR'),
+        'Persistence Anomali':('pred_anom_Persistence_Anom',None),
+        'Persistence Suhu':('pred_anom_Persistence_RawTemp',None),
+    }
+    low,hi=df['target_date'].min().date(),df['target_date'].max().date()
+    interval=st.date_input('Rentang tanggal target',value=(low,hi),min_value=low,max_value=hi)
+    if len(interval)==2:
+        df=df[df['target_date'].dt.date.between(*interval)]
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=df['target_date'],y=df['target_anom'],mode='lines',name='Target referensi ERA5-Land',line=dict(color='#111827',width=2.4)))
+    for name in selected:
+        col=mapping[name][0 if regimen.startswith('Utama') else 1]
+        if col in df.columns:
+            fig.add_trace(go.Scatter(x=df['target_date'],y=df[col],mode='lines',name=name,line=dict(color=COLORS[name],width=1.5)))
+    fig.update_layout(title=f'Anomali suhu (°C) · {hor}',xaxis_title='Tanggal target',yaxis_title='Anomali (°C)')
+    st.plotly_chart(plot_style(fig,550),use_container_width=True)
+    st.caption('Semua kurva berasal dari file prediksi data uji independen 2024–2025. Titik pada grafik bukan pengukuran suhu air in-situ.')
+    download_df(df,'deret_waktu_'+hor.replace('+','plus')+'.csv')
 
-elif menu == "2. Komparasi RF, XGBoost, SVR & Baseline":
-    st.subheader("2. Komparasi Kinerja Random Forest, XGBoost, SVR, dan Dua Baseline Persistence")
+elif page == "Validasi ROCV":
+    st.title('Validasi kronologis 3-fold dan tuning')
+    hor=st.radio('Horizon', ['t+1','t+3'], horizontal=True)
+    x=tuning[tuning['Horizon']==hor].copy()
+    x['Skema']=x['Rezim_Fitur'].map(scheme_label)
+    sk=st.selectbox('Skema',['Utama · 73 fitur','Ablasi · 55 fitur'])
+    x=x[x['Skema']==sk].copy()
+    best=x.sort_values('ROCV_Mean_RMSE').groupby('Algoritma',as_index=False).first()
+    st.subheader('Konfigurasi terbaik per algoritma (berdasarkan ROCV mean RMSE)')
+    st.dataframe(best[['Algoritma','Konfigurasi','ROCV_Mean_RMSE','ROCV_Std_RMSE','ROCV_Mean_R2']],hide_index=True,use_container_width=True)
+    fold_cols=['Fold1_2020_2021_RMSE','Fold2_2021_2022_RMSE','Fold3_2022_2023_RMSE']
+    long=best.melt(id_vars=['Algoritma'],value_vars=fold_cols,var_name='Fold',value_name='RMSE')
+    long['Fold']=long['Fold'].map(dict(zip(fold_cols,['Fold 1: 2020–2021','Fold 2: 2021–2022','Fold 3: 2022–2023'])))
+    fig=px.bar(long,x='Fold',y='RMSE',color='Algoritma',barmode='group',title='RMSE masing-masing fold pada konfigurasi terbaik',color_discrete_map=COLORS)
+    st.plotly_chart(plot_style(fig),use_container_width=True)
+    with st.expander('Lihat seluruh kandidat hyperparameter'):
+        st.dataframe(x,hide_index=True,use_container_width=True)
+        download_df(x,'tuning_rocv.csv')
+    st.caption('Pemilihan hyperparameter menggunakan data pra-uji hingga 2023; data 2024–2025 tidak digunakan untuk tuning.')
 
-    f_col1, f_col2 = st.columns(2)
-    with f_col1:
-        sel_hor = st.selectbox("Pilih Horizon Prediksi:", ["Semua Horizon (t+1 & t+3)", "t+1", "t+3"])
-    with f_col2:
-        sel_reg = st.selectbox(
-            "Pilih Rezim Fitur Input:",
-            ["Semua Rezim (73 & 55 Fitur)", "1_Utama (73 Fitur: Termal + Meteo)", "2_Ablasi (55 Fitur: Murni Meteo)"]
-        )
+elif page == "Feature Importance":
+    st.title('Analisis kepentingan fitur')
+    hor=st.radio('Horizon',['t+1','t+3'],horizontal=True)
+    algo=st.radio('Algoritma',['XGBoost','Random Forest'],horizontal=True)
+    sk=st.radio('Skema',['Utama · 73 fitur','Ablasi · 55 fitur'],horizontal=True)
+    raw='1_Utama' if sk.startswith('Utama') else '2_Ablasi_Murni_Meteo'
+    x=fi[(fi['Horizon']==hor)&(fi['Model']==algo)&(fi['Rezim_Fitur']==raw)].sort_values('Importance',ascending=False)
+    top=st.slider('Jumlah fitur teratas',min_value=5,max_value=min(10,len(x)),value=min(8,len(x)))
+    view=x.head(top).sort_values('Importance')
+    fig=px.bar(view,x='Importance',y='Fitur',orientation='h',color_discrete_sequence=['#0D9488'],text_auto='.4f',title=f'{algo} · {hor} · {sk}',labels={'Importance':'Kepentingan relatif'})
+    st.plotly_chart(plot_style(fig,500),use_container_width=True)
+    st.dataframe(x,hide_index=True,use_container_width=True)
+    st.caption('Nilai feature importance merupakan ukuran relatif yang spesifik pada model, bukan bukti hubungan kausal variabel meteorologi terhadap peristiwa upwelling.')
 
-    sub_test = test_df.copy()
-    if sel_hor != "Semua Horizon (t+1 & t+3)":
-        sub_test = sub_test[sub_test["Horizon"] == sel_hor]
-    if sel_reg.startswith("1_Utama"):
-        sub_test = sub_test[sub_test["Rezim_Fitur"].str.startswith("1_Utama")]
-    elif sel_reg.startswith("2_Ablasi"):
-        sub_test = sub_test[sub_test["Rezim_Fitur"].str.startswith("2_Ablasi")]
+elif page == "Audit Satelit":
+    st.title('Audit kesesuaian ERA5-Land dan pengamatan satelit')
+    st.markdown('Satelit MODIS dan Landsat digunakan sebagai **pembanding observasional**, bukan sebagai label pelatihan regresi.')
+    st.subheader('Audit grid ERA5-Land')
+    grid=files['audit_grid.csv']
+    st.dataframe(grid,hide_index=True,use_container_width=True)
+    cols=['Kategori_Sensitivitas','N_Hari','Persen_Hari_10Thn','Bias_Terra_minus_ERA5_Mix_C','MAE_vs_ERA5_Mix_C','RMSE_vs_ERA5_Mix_C','Pearson_r_vs_ERA5_Mix']
+    valid=[c for c in cols if c in sat.columns]
+    st.subheader('Sensitivitas penyaringan kualitas observasi')
+    st.dataframe(sat[valid],hide_index=True,use_container_width=True)
+    x=sat[sat['Kategori_Sensitivitas'].str.contains('Terra|Ambang|Fokus',case=False,na=False)].copy()
+    fig=px.scatter(x,x='N_Hari',y='MAE_vs_ERA5_Mix_C',size='N_Hari',hover_name='Kategori_Sensitivitas',title='Trade-off jumlah hari valid vs MAE terhadap ERA5-Land',labels={'N_Hari':'Jumlah hari pengamatan lolos filter','MAE_vs_ERA5_Mix_C':'MAE (°C)'},size_max=38)
+    st.plotly_chart(plot_style(fig),use_container_width=True)
+    st.info('Pada filter MODIS Terra siang paling ketat, terdapat 117 dari 3.653 hari (≈3,2%), dengan MAE ≈1,10°C dan korelasi Pearson ≈0,298. Perbandingan ini mencampurkan besaran fisik dan waktu pengamatan yang berbeda.')
+    download_df(sat,'audit_satelit.csv')
 
-    st.markdown("##### Tabel Hasil Evaluasi pada Data Uji Independen (2024–2025)")
-    st.dataframe(
-        sub_test.style.format({
-            "Test_Anom_MAE": "{:.4f}",
-            "Test_Anom_RMSE": "{:.4f}",
-            "Test_Anom_R2": "{:.4f}",
-            "Test_Temp_MAE": "{:.4f}",
-            "Test_Temp_RMSE": "{:.4f}",
-            "Test_Temp_R2": "{:.4f}",
-            "Skill_RMSE_vs_PersistAnom_Pct": "{:+.2f}%",
-        }),
-        use_container_width=True
-    )
+elif page == "Catatan Historis":
+    st.title('Analisis deskriptif catatan historis 2016–2025')
+    st.warning('15 kandidat catatan historis bukan label tervalidasi untuk klasifikasi/deteksi upwelling. Interpretasi dibedakan menurut presisi tanggal dan periode evaluasi.')
+    a,b,c=st.columns(3)
+    a.metric('Catatan historis',str(len(upw)))
+    counts=upw['date_precision'].value_counts()
+    b.metric('Tanggal harian spesifik',str(int(counts.get('Exact_Day',0))))
+    c.metric('Episode / bulanan',str(int(len(upw)-counts.get('Exact_Day',0))))
+    p=st.selectbox('Presisi tanggal',['Semua','Exact_Day','Multi_Day','Month_Only'])
+    x=upw if p=='Semua' else upw[upw['date_precision']==p]
+    if len(x):
+        fig=px.bar(x,x='record_id',y='obs_mean_anom_c',color='date_precision',hover_data=['fish_loss_tons','eval_regime'],title='Rata-rata anomali pada jendela masing-masing catatan',labels={'record_id':'ID catatan','obs_mean_anom_c':'Anomali rerata (°C)'})
+        fig.add_hline(y=0,line_dash='dash',line_color='gray')
+        st.plotly_chart(plot_style(fig),use_container_width=True)
+    st.caption('Jendela kelompok Exact_Day (5 hari) tidak boleh disamakan secara langsung dengan jendela Multi_Day atau Month_Only.')
+    st.subheader('Evaluasi deskriptif')
+    st.dataframe(x,hide_index=True,use_container_width=True)
+    with st.expander('Inventaris sumber dan catatan kejadian'):
+        st.dataframe(inv,hide_index=True,use_container_width=True)
+    download_df(x,'catatan_historis.csv')
 
-    st.markdown("##### Tabel Hasil Seleksi Hyperparameter 3-Fold Rolling-Origin CV (2016–2023)")
-    st.dataframe(
-        rocv_df.style.format({
-            "Fold1_2020_2021_RMSE": "{:.4f}",
-            "Fold2_2021_2022_RMSE": "{:.4f}",
-            "Fold3_2022_2023_RMSE": "{:.4f}",
-            "ROCV_Mean_RMSE": "{:.4f}",
-            "ROCV_Std_RMSE": "{:.4f}",
-            "ROCV_Mean_MAE": "{:.4f}",
-            "ROCV_Mean_R2": "{:.4f}",
-        }),
-        use_container_width=True
-    )
+else:
+    st.title('Tentang sumber data dan metodologi')
+    st.markdown('''**Judul penelitian:** Komparasi Algoritma Random Forest, XGBoost, dan Support Vector Regression untuk Prediksi Anomali Suhu Lapisan Tercampur Reanalisis ERA5-Land di Kawasan Danau Maninjau Berbasis Google Earth Engine.
 
-    img_g2 = BASE_DIR / "Gambar_2_Komparasi_RMSE_Uji_2024_2025.png"
-    if img_g2.is_file():
-        st.markdown("##### Visualisasi Perbandingan RMSE pada Data Uji Independen (Gambar 3 Naskah)")
-        st.image(str(img_g2), use_container_width=True)
+**Sumber model:** `ECMWF/ERA5_LAND/DAILY_AGGR`, variabel `lake_mix_layer_temperature`, dengan audit CHIRPS, MODIS Terra/Aqua, dan Landsat 8/9.
 
-elif menu == "3. Grafik Target Referensi ERA5-Land vs Prediksi":
-    st.subheader("3. Deret Waktu Target Referensi ERA5-Land vs Prediksi Model (Periode Uji Independen 2024–2025)")
+**Pembagian data:** pelatihan dan tuning kronologis menggunakan periode hingga 2023; pengujian independen pada 2024–2025. Dua horizon: t+1 dan t+3. Skema utama 73 fitur dan ablasi 55 fitur.
 
-    c_h, c_d1, c_d2 = st.columns([1.2, 1, 1])
-    with c_h:
-        hor_choice = st.radio("Pilih Horizon:", ["Horizon t+1 (1 Hari ke Depan)", "Horizon t+3 (3 Hari ke Depan)"], horizontal=True)
-    df_p = pred_t1 if "t+1" in hor_choice else pred_t3
-    min_d = df_p["target_date"].min().date()
-    max_d = df_p["target_date"].max().date()
-    with c_d1:
-        start_d = st.date_input("Tanggal Mulai:", value=min_d, min_value=min_d, max_value=max_d)
-    with c_d2:
-        end_d = st.date_input("Tanggal Akhir:", value=max_d, min_value=min_d, max_value=max_d)
+**Metode:** Random Forest, XGBoost, SVR RBF, dibandingkan dua baseline persistence. Evaluasi MAE, RMSE, R². Analisis historis upwelling hanya deskriptif-eksploratif.
 
-    sub_p = df_p[(df_p["target_date"].dt.date >= start_d) & (df_p["target_date"].dt.date <= end_d)].copy()
+**Keterbatasan penting:** target adalah **keluaran FLake/ERA5-Land pada grid campuran**; nilai performa bukan validasi lapangan dan dashboard tidak memberi prediksi real-time.
 
-    fig, ax = plt.subplots(figsize=(12.2, 4.2), dpi=200)
-    ax.axhline(0, color="#666666", linestyle="--", linewidth=0.9)
-    ax.plot(sub_p["target_date"], sub_p["target_anom"], label="Target Referensi ERA5-Land", color="black", linewidth=1.6)
-    ax.plot(sub_p["target_date"], sub_p["pred_anom_XGBoost"], label="Prediksi XGBoost (Skema Utama 73 Fitur)", color="#e41a1c", linewidth=1.25)
-    ax.plot(sub_p["target_date"], sub_p["pred_anom_SVR"], label="Prediksi SVR (Skema Utama 73 Fitur)", color="#377eb8", linewidth=1.05, alpha=0.85)
-    ax.plot(sub_p["target_date"], sub_p["pred_anom_RandomForest"], label="Prediksi Random Forest (Skema Utama 73 Fitur)", color="#2ca25f", linewidth=0.95, alpha=0.75)
-    ax.set_ylabel("Anomali Suhu Lapisan Tercampur (°C)", fontsize=9.5, fontweight="bold")
-    ax.set_xlabel("Tanggal Target (Periode Uji Independen)", fontsize=9.5, fontweight="bold")
-    ax.set_title(f"Perbandingan Target Referensi ERA5-Land vs Prediksi Model — {hor_choice}", fontsize=10.5, fontweight="bold")
-    ax.legend(loc="lower left", ncol=2, fontsize=8.5, frameon=True)
-    ax.grid(True, linestyle=":", alpha=0.45)
-    fig.tight_layout()
-    st.pyplot(fig)
-    plt.close(fig)
-
-    with st.expander("Lihat Tabel Nilai Prediksi Harian (CSV Uji Independen)"):
-        st.dataframe(sub_p, use_container_width=True)
-
-elif menu == "4. Feature Importance & Ablasi (73 vs 55 Fitur)":
-    st.subheader("4. Analisis Feature Importance & Perbandingan Skema Utama (73 Fitur) vs Ablasi (55 Fitur)")
-
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        fi_hor = st.selectbox("Horizon:", ["t+1", "t+3"])
-    with col_f2:
-        fi_reg = st.selectbox("Rezim Fitur:", ["1_Utama", "2_Ablasi_Murni_Meteo"])
-    with col_f3:
-        fi_mod = st.selectbox("Algoritma Pohon:", ["XGBoost", "Random Forest"])
-
-    sub_fi = feat_df[
-        (feat_df["Horizon"] == fi_hor) &
-        (feat_df["Rezim_Fitur"] == fi_reg) &
-        (feat_df["Model"] == fi_mod)
-    ].copy()
-
-    st.markdown(f"##### Top-15 Fitur dengan Kontribusi Relatif Tertinggi ({fi_mod} — {fi_reg}, Horizon {fi_hor})")
-    st.dataframe(sub_fi.style.format({"Importance": "{:.4f}"}), use_container_width=True)
-
-    img_g4 = BASE_DIR / "Gambar_4_Feature_Importance_XGBoost.png"
-    if img_g4.is_file():
-        st.markdown("##### Grafik Perbandingan Kontribusi Fitur XGBoost: 73 Fitur vs 55 Fitur (Gambar 5 Naskah)")
-        st.image(str(img_g4), use_container_width=True)
-
-elif menu == "5. Audit ERA5-Land vs MODIS/Landsat":
-    st.subheader("5. Hasil Audit Spasial Sel Grid ERA5-Land & Sensitivitas Kualitas Piksel Satelit")
-
-    st.markdown("##### A. Audit Spasial 4 Sel Grid ERA5-Land di Sekitar Kaldera Danau Maninjau (`maninjau_audit_grid_era5.csv`)")
-    st.dataframe(grid_df, use_container_width=True)
-
-    st.markdown("##### B. Analisis Sensitivitas Kesesuaian Suhu Harian ERA5-Land terhadap MODIS Terra Siang (`evaluasi_khusus_era5_vs_modis_terra.csv`)")
-    st.dataframe(
-        modis_sens.style.format({
-            "Persen_Hari_Tersedia": "{:.2f}%",
-            "Mean_MODIS_Terra_C": "{:.2f}",
-            "Mean_ERA5_Mix_C": "{:.2f}",
-            "Bias_Terra_minus_ERA5_Mix_C": "{:+.2f}",
-            "MAE_vs_ERA5_Mix_C": "{:.2f}",
-            "RMSE_vs_ERA5_Mix_C": "{:.2f}",
-            "Pearson_r_vs_ERA5_Mix": "{:.3f}",
-            "Spearman_rho_vs_ERA5_Mix": "{:.3f}",
-        }),
-        use_container_width=True
-    )
-
-    img_g1 = BASE_DIR / "Gambar_1_Audit_ERA5_vs_MODIS_Terra.png"
-    if img_g1.is_file():
-        st.markdown("##### Visualisasi Sensitivitas Galat (MAE), Bias Dingin, dan Korelasi MODIS Terra Siang (Gambar 2 Naskah)")
-        st.image(str(img_g1), use_container_width=True)
-
-elif menu == "6. Eksplorasi 15 Catatan Historis Upwelling":
-    st.subheader("6. Evaluasi Deskriptif-Eksploratif pada 15 Kandidat Catatan Historis (2016–2025)")
-    st.warning(
-        "**Penting:** Evaluasi ini bersifat deskriptif-eksploratif. Dari 10 catatan harian spesifik (`Exact_Day`), "
-        "terdapat 5 kejadian yang justru memiliki anomali suhu positif pada ERA5-Land (termasuk `REC-13` pada Januari 2025 "
-        "sebesar $+0,29^\\circ\\text{C}$). Oleh karena itu, anomali suhu reanalisis skala grid 11,1 km tidak diklaim sebagai "
-        "pendeteksi tunggal kejadian *upwelling*."
-    )
-
-    merged_upw = pd.merge(
-        upw_df,
-        inv_df[["record_id", "reported_event_date", "start_date", "end_date", "location_nagari", "source_agency", "source_url", "notes"]],
-        on="record_id",
-        how="left"
-    )
-
-    cat_filter = st.radio(
-        "Pilih Kategori Presisi Tanggal Catatan:",
-        ["Exact_Day (N=10 Catatan Harian Spesifik)", "Multi_Day (N=3 Episode Multi-Hari)", "Month_Only (N=2 Catatan Bulanan)"],
-        horizontal=True
-    )
-    if cat_filter.startswith("Exact_Day"):
-        sub_u = merged_upw[merged_upw["date_precision"] == "Exact_Day"]
-    elif cat_filter.startswith("Multi_Day"):
-        sub_u = merged_upw[merged_upw["date_precision"].str.startswith("Multi_Day")]
-    else:
-        sub_u = merged_upw[merged_upw["date_precision"] == "Month_Only"]
-
-    st.dataframe(sub_u, use_container_width=True)
-
-    img_g5 = BASE_DIR / "Gambar_5_Evaluasi_Deskriptif_Upwelling_ExactDay.png"
-    if img_g5.is_file() and cat_filter.startswith("Exact_Day"):
-        st.markdown("##### Distribusi Deskriptif Anomali Suhu ERA5-Land pada 10 Catatan Harian Spesifik (Gambar 6 Naskah)")
-        st.image(str(img_g5), use_container_width=True)
+**Reproduksibilitas:** aplikasi ini membaca CSV hasil eksperimen yang disertakan. Pelatihan ulang dilakukan secara terpisah menggunakan skrip eksperimen/Google Colab yang menjadi artefak penelitian.
+''')
+    st.subheader('Daftar berkas data yang dibundel')
+    st.dataframe(pd.DataFrame({'Nama CSV':sorted(p.name for p in DATA.glob('*.csv'))}),hide_index=True,use_container_width=True)
+    st.caption('Semua hasil harus dipertahankan konsisten dengan BAB IV dan CSV penelitian final. Jangan mengganti satu CSV saja dengan versi eksperimen lain.')

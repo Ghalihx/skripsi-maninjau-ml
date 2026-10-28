@@ -1,20 +1,10 @@
-# Python bytecode
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Temporary lock files (Microsoft Word, etc.)
-~$*
-.lock
-
-# Environment & IDE
-.env
 .venv/
-env/
 venv/
-.idea/
-.vscode/
-
-# System files
+.env
+.streamlit/secrets.toml
 .DS_Store
 Thumbs.db
+~$*
+.lock
