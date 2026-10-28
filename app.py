@@ -40,12 +40,12 @@ h1,h2,h3 {letter-spacing:-.035em}
 </style>''', unsafe_allow_html=True)
 
 st.sidebar.title("🌊 Danau Maninjau")
-st.sidebar.caption("Dashboard hasil penelitian • 2016–2025")
+st.sidebar.caption("Pelatihan ulang + hasil penelitian • 2016–2025")
 page = st.sidebar.radio("Navigasi", [
-    "Ringkasan", "Komparasi Model", "Prediksi Deret Waktu", "Validasi ROCV", "Feature Importance",
+    "Latih Model dari CSV", "Ringkasan", "Komparasi Model", "Prediksi Deret Waktu", "Validasi ROCV", "Feature Importance",
     "Audit Satelit", "Catatan Historis", "Tentang Data"], index=0)
 st.sidebar.divider()
-st.sidebar.info("**Target model adalah anomali suhu keluaran ERA5-Land/FLake**, bukan pengukuran in-situ atau deteksi upwelling. Seluruh grafik diturunkan dari CSV eksperimen yang disertakan.")
+st.sidebar.info("**Target adalah anomali keluaran ERA5-Land/FLake**, bukan suhu in-situ atau deteksi upwelling. Halaman pelatihan memakai CSV unggahan; halaman lainnya menampilkan arsip hasil penelitian.")
 st.sidebar.caption("Skema 1 · Komparasi RF, XGBoost, dan SVR · Data uji 2024–2025")
 
 MODEL_MAP = {
@@ -73,7 +73,11 @@ def plot_style(fig, height=480):
     fig.update_layout(height=height, margin=dict(l=20,r=20,t=55,b=30), legend_title_text='', hovermode='x unified')
     return fig
 
-if page == "Ringkasan":
+if page == "Latih Model dari CSV":
+    from training_ui import show_training_page
+    show_training_page()
+
+elif page == "Ringkasan":
     st.title("Analisis Prediksi Anomali Suhu ERA5-Land")
     st.caption("Kawasan Danau Maninjau · eksperimen retrospektif 2016–2025 · pengujian independen 2024–2025")
     x=prep_metric()
@@ -231,7 +235,7 @@ else:
 
 **Keterbatasan penting:** target adalah **keluaran FLake/ERA5-Land pada grid campuran**; nilai performa bukan validasi lapangan dan dashboard tidak memberi prediksi real-time.
 
-**Reproduksibilitas:** aplikasi ini membaca CSV hasil eksperimen yang disertakan. Pelatihan ulang dilakukan secara terpisah menggunakan skrip eksperimen/Google Colab yang menjadi artefak penelitian.
+**Reproduksibilitas:** menu **Latih Model dari CSV** menjalankan ulang skrip eksperimen asli menggunakan file unggahan. Menu lain menampilkan hasil arsip penelitian dan tidak otomatis diganti oleh hasil unggahan.
 ''')
     st.subheader('Daftar berkas data yang dibundel')
     st.dataframe(pd.DataFrame({'Nama CSV':sorted(p.name for p in DATA.glob('*.csv'))}),hide_index=True,use_container_width=True)
