@@ -1,0 +1,81 @@
+Horizon,Rezim_Fitur,Model,Rank,Fitur,Importance
+t+1,1_Utama,Random Forest,1,anom_doy_c,0.9332483473945435
+t+1,1_Utama,Random Forest,2,precip_era5_mm,0.011733041237379418
+t+1,1_Utama,Random Forest,3,thermal_net_rad_mjm2,0.00464940753897263
+t+1,1_Utama,Random Forest,4,u_wind_10m_ms,0.0036638704815430724
+t+1,1_Utama,Random Forest,5,precip_chirps_mm,0.003445311951896477
+t+1,1_Utama,Random Forest,6,anom_doy_lag2,0.0021250344954252347
+t+1,1_Utama,Random Forest,7,anom_doy_lag3,0.001384225250715622
+t+1,1_Utama,Random Forest,8,anom_doy_lag1,0.0013731445880434446
+t+1,1_Utama,Random Forest,9,lake_temp_std3d,0.001061404258859378
+t+1,1_Utama,Random Forest,10,lake_temp_diff3d,0.0010573105936370862
+t+1,1_Utama,XGBoost,1,anom_doy_c,0.3312950134277344
+t+1,1_Utama,XGBoost,2,anom_doy_lag1,0.3212479054927826
+t+1,1_Utama,XGBoost,3,anom_doy_lag2,0.07137095183134079
+t+1,1_Utama,XGBoost,4,anom_doy_lag3,0.030966738238930702
+t+1,1_Utama,XGBoost,5,thermal_net_rad_mjm2,0.019767869263887405
+t+1,1_Utama,XGBoost,6,anom_doy_lag7,0.014807271771132946
+t+1,1_Utama,XGBoost,7,air_temp_mean_c,0.013804067857563496
+t+1,1_Utama,XGBoost,8,precip_era5_mm,0.012236764654517174
+t+1,1_Utama,XGBoost,9,precip_chirps_mm,0.009257139638066292
+t+1,1_Utama,XGBoost,10,u_wind_10m_ms,0.007742973975837231
+t+1,2_Ablasi_Murni_Meteo,Random Forest,1,air_temp_mean_c_mean14d,0.2661142358156056
+t+1,2_Ablasi_Murni_Meteo,Random Forest,2,air_temp_mean_c_mean7d,0.12383810975424174
+t+1,2_Ablasi_Murni_Meteo,Random Forest,3,sin_doy,0.12073257305341996
+t+1,2_Ablasi_Murni_Meteo,Random Forest,4,cos_doy,0.09231820567163011
+t+1,2_Ablasi_Murni_Meteo,Random Forest,5,solar_net_rad_mjm2_mean14d,0.07364888765584707
+t+1,2_Ablasi_Murni_Meteo,Random Forest,6,thermal_net_rad_mjm2_mean14d,0.04496609905998482
+t+1,2_Ablasi_Murni_Meteo,Random Forest,7,precip_era5_mm_sum14d,0.03335577953162136
+t+1,2_Ablasi_Murni_Meteo,Random Forest,8,wind_speed_10m_mean14d,0.018972936369072112
+t+1,2_Ablasi_Murni_Meteo,Random Forest,9,thermal_net_rad_mjm2,0.017709900761213506
+t+1,2_Ablasi_Murni_Meteo,Random Forest,10,precip_chirps_mm_sum14d,0.014214066537261039
+t+1,2_Ablasi_Murni_Meteo,XGBoost,1,air_temp_mean_c_mean14d,0.148899108171463
+t+1,2_Ablasi_Murni_Meteo,XGBoost,2,air_temp_mean_c_mean7d,0.14567473530769348
+t+1,2_Ablasi_Murni_Meteo,XGBoost,3,solar_net_rad_mjm2_mean14d,0.057252563536167145
+t+1,2_Ablasi_Murni_Meteo,XGBoost,4,air_temp_mean_c_mean3d,0.05063632130622864
+t+1,2_Ablasi_Murni_Meteo,XGBoost,5,sin_doy,0.04266975075006485
+t+1,2_Ablasi_Murni_Meteo,XGBoost,6,thermal_net_rad_mjm2_mean14d,0.042423199862241745
+t+1,2_Ablasi_Murni_Meteo,XGBoost,7,cos_doy,0.04215310513973236
+t+1,2_Ablasi_Murni_Meteo,XGBoost,8,air_temp_mean_c,0.03762730211019516
+t+1,2_Ablasi_Murni_Meteo,XGBoost,9,thermal_net_rad_mjm2,0.02798985317349434
+t+1,2_Ablasi_Murni_Meteo,XGBoost,10,thermal_net_rad_mjm2_mean7d,0.026476547122001648
+t+3,1_Utama,Random Forest,1,anom_doy_c,0.8772657977238433
+t+3,1_Utama,Random Forest,2,precip_era5_mm,0.01206867393545735
+t+3,1_Utama,Random Forest,3,anom_doy_lag1,0.007618410817729417
+t+3,1_Utama,Random Forest,4,anom_doy_lag2,0.00750305094068255
+t+3,1_Utama,Random Forest,5,thermal_net_rad_mjm2,0.006221225495591786
+t+3,1_Utama,Random Forest,6,anom_doy_lag3,0.004536197339144827
+t+3,1_Utama,Random Forest,7,precip_chirps_mm,0.003896719443121532
+t+3,1_Utama,Random Forest,8,anom_doy_lag7,0.0036539845164382414
+t+3,1_Utama,Random Forest,9,precip_chirps_mm_sum3d,0.0031021691557738184
+t+3,1_Utama,Random Forest,10,surface_pressure_hpa,0.0027823173741435537
+t+3,1_Utama,XGBoost,1,anom_doy_c,0.2937489151954651
+t+3,1_Utama,XGBoost,2,anom_doy_lag1,0.16621264815330505
+t+3,1_Utama,XGBoost,3,anom_doy_lag2,0.08320821076631546
+t+3,1_Utama,XGBoost,4,air_temp_mean_c,0.027873964980244637
+t+3,1_Utama,XGBoost,5,anom_doy_lag3,0.02771604247391224
+t+3,1_Utama,XGBoost,6,anom_doy_lag7,0.024735473096370697
+t+3,1_Utama,XGBoost,7,thermal_net_rad_mjm2,0.015682809054851532
+t+3,1_Utama,XGBoost,8,precip_era5_mm,0.014366383664309978
+t+3,1_Utama,XGBoost,9,thermal_net_rad_mjm2_mean3d,0.011984111741185188
+t+3,1_Utama,XGBoost,10,precip_chirps_mm_sum7d,0.011552190408110619
+t+3,2_Ablasi_Murni_Meteo,Random Forest,1,air_temp_mean_c_mean14d,0.1998237897129888
+t+3,2_Ablasi_Murni_Meteo,Random Forest,2,air_temp_mean_c_mean7d,0.1681435622893016
+t+3,2_Ablasi_Murni_Meteo,Random Forest,3,sin_doy,0.10899235279152715
+t+3,2_Ablasi_Murni_Meteo,Random Forest,4,cos_doy,0.10082269678319376
+t+3,2_Ablasi_Murni_Meteo,Random Forest,5,thermal_net_rad_mjm2_mean14d,0.07724438671824793
+t+3,2_Ablasi_Murni_Meteo,Random Forest,6,solar_net_rad_mjm2_mean14d,0.038466006021509035
+t+3,2_Ablasi_Murni_Meteo,Random Forest,7,precip_era5_mm_sum14d,0.03503233606891105
+t+3,2_Ablasi_Murni_Meteo,Random Forest,8,wind_speed_10m_mean14d,0.02800714178706101
+t+3,2_Ablasi_Murni_Meteo,Random Forest,9,precip_chirps_mm_sum14d,0.020466894810586965
+t+3,2_Ablasi_Murni_Meteo,Random Forest,10,v_wind_10m_ms,0.013588553622122218
+t+3,2_Ablasi_Murni_Meteo,XGBoost,1,air_temp_mean_c_mean7d,0.1667630672454834
+t+3,2_Ablasi_Murni_Meteo,XGBoost,2,air_temp_mean_c_mean14d,0.13183051347732544
+t+3,2_Ablasi_Murni_Meteo,XGBoost,3,thermal_net_rad_mjm2_mean14d,0.0626583844423294
+t+3,2_Ablasi_Murni_Meteo,XGBoost,4,cos_doy,0.047971211373806
+t+3,2_Ablasi_Murni_Meteo,XGBoost,5,sin_doy,0.04184504225850105
+t+3,2_Ablasi_Murni_Meteo,XGBoost,6,solar_net_rad_mjm2_mean14d,0.036196209490299225
+t+3,2_Ablasi_Murni_Meteo,XGBoost,7,air_temp_mean_c_mean3d,0.034806787967681885
+t+3,2_Ablasi_Murni_Meteo,XGBoost,8,wind_speed_10m_mean14d,0.025003569200634956
+t+3,2_Ablasi_Murni_Meteo,XGBoost,9,precip_era5_mm_sum14d,0.024753859266638756
+t+3,2_Ablasi_Murni_Meteo,XGBoost,10,precip_era5_mm_sum7d,0.02270372584462166
